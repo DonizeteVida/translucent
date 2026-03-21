@@ -9,42 +9,46 @@
 #include <stdlib.h>
 #include <math.h>
 
-struct args
+struct
 {
     float window_scale;
     float image_scale;
     float opacity;
     char filename[256];
-} args = {
+} static args = {
     .window_scale = 1.0f,
     .image_scale = 1.0f,
     .opacity = .5f,
 };
 
-struct state
+struct
 {
     SDL_Window *window;
     SDL_Renderer *renderer;
     SDL_Texture *texture;
-    SDL_FRect rect_dest;
+    SDL_FRect texture_info;
 
     bool is_dragging;
     float window_scale;
     float image_scale;
     float opacity;
-    uint8_t is_scaling;
+
+    // keycode "I" for image
+    // keycode "W" for window
+    // keycode "A" for all
+    uint8_t scale_mode;
     uint16_t tmp_scale;
-} state = {
+} static state = {
     .window_scale = 1.0f,
     .image_scale = 1.0f,
     .opacity = .5f,
-    .rect_dest = {
+    .texture_info = {
         .x = 0,
         .y = 0,
         .w = 0,
         .h = 0,
     },
-    .is_scaling = SDL_SCANCODE_UNKNOWN,
+    .scale_mode = SDL_SCANCODE_UNKNOWN,
     .tmp_scale = 0,
 };
 
@@ -137,168 +141,180 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     state.window_scale = args.window_scale;
     state.image_scale = args.image_scale;
 
-    state.rect_dest.w = state.texture->w;
-    state.rect_dest.h = state.texture->h;
+    state.texture_info.w = state.texture->w;
+    state.texture_info.h = state.texture->h;
 
-    SDL_SetWindowOpacity(
-        state.window,
-        state.opacity);
-    SDL_SetRenderScale(
-        state.renderer,
-        state.image_scale,
-        state.image_scale);
-    SDL_SetTextureScaleMode(
-        state.texture,
-        SDL_SCALEMODE_NEAREST);
+    SDL_SetWindowOpacity(state.window, state.opacity);
+    SDL_SetRenderScale(state.renderer, state.image_scale, state.image_scale);
+    SDL_SetTextureScaleMode(state.texture, SDL_SCALEMODE_NEAREST);
+
+    return SDL_APP_CONTINUE;
+}
+
+static void restore_default_args_into_state()
+{
+    state.opacity = args.opacity;
+    SDL_SetWindowOpacity(state.window, state.opacity);
+
+    state.window_scale = args.window_scale;
+    SDL_SetWindowSize(state.window, state.texture->w * args.window_scale, state.texture->h * args.window_scale);
+
+    state.image_scale = args.image_scale;
+    SDL_SetRenderScale(state.renderer, state.image_scale, state.image_scale);
+
+    state.texture_info.x = 0;
+    state.texture_info.y = 0;
+}
+
+static SDL_AppResult handle_key_down_event(SDL_Scancode scancode)
+{
+    SDL_Window *window = state.window;
+    SDL_Texture *texture = state.texture;
+    SDL_FRect *texture_info = &state.texture_info;
+
+    if (scancode >= SDL_SCANCODE_1 && scancode <= SDL_SCANCODE_0)
+    {
+        uint8_t number = ((scancode + 1) - SDL_SCANCODE_1) % 10;
+        state.tmp_scale *= 10;
+        state.tmp_scale += number;
+    }
+
+    switch (scancode)
+    {
+    case SDL_SCANCODE_ESCAPE:
+        return SDL_APP_SUCCESS;
+    case SDL_SCANCODE_R:
+        restore_default_args_into_state();
+        return SDL_APP_CONTINUE;
+    case SDL_SCANCODE_RIGHT:
+        texture_info->x += 1;
+        break;
+    case SDL_SCANCODE_LEFT:
+        texture_info->x += -1;
+        break;
+    case SDL_SCANCODE_DOWN:
+        texture_info->y += 1;
+        break;
+    case SDL_SCANCODE_UP:
+        texture_info->y -= 1;
+        break;
+    }
+
+    if (!state.scale_mode)
+    {
+        if (scancode == SDL_SCANCODE_W)
+        {
+            state.scale_mode = SDL_SCANCODE_W;
+        }
+        else if (scancode == SDL_SCANCODE_I)
+        {
+            state.scale_mode = SDL_SCANCODE_I;
+        }
+        state.tmp_scale = 0;
+    }
+    else
+    {
+        if (scancode == SDL_SCANCODE_RETURN)
+        {
+            if (state.scale_mode == SDL_SCANCODE_W)
+            {
+                state.window_scale = state.tmp_scale / 100.0f;
+            }
+            if (state.scale_mode == SDL_SCANCODE_I)
+            {
+                state.image_scale = state.tmp_scale / 100.0f;
+            }
+
+            SDL_SetWindowSize(
+                window,
+                texture->w * state.window_scale,
+                texture->h * state.window_scale);
+            SDL_SetRenderScale(
+                state.renderer,
+                state.image_scale,
+                state.image_scale);
+
+            state.tmp_scale = 0;
+            state.scale_mode = SDL_SCANCODE_UNKNOWN;
+        }
+        if (scancode == SDL_SCANCODE_ESCAPE)
+        {
+            state.tmp_scale = 0;
+            state.scale_mode = SDL_SCANCODE_UNKNOWN;
+            return SDL_APP_CONTINUE;
+        }
+    }
+
+    return SDL_APP_CONTINUE;
+}
+
+static SDL_AppResult handle_mouse_wheel_event(float y)
+{
+    state.opacity += y > .0f ? +.1f : -.1f;
+    state.opacity = SDL_clamp(state.opacity, 0.0f, 1.0f);
+
+    SDL_SetWindowOpacity(state.window, state.opacity);
+
+    return SDL_APP_CONTINUE;
+}
+
+static SDL_AppResult handle_mouse_button_event(SDL_Event *event)
+{
+    switch (event->type)
+    {
+    case SDL_EVENT_MOUSE_BUTTON_DOWN:
+    {
+        state.is_dragging = true;
+        break;
+    }
+    case SDL_EVENT_MOUSE_BUTTON_UP:
+    {
+        state.is_dragging = false;
+        // round our drag and drop to be pixel perfect
+        state.texture_info.x = round(state.texture_info.x);
+        state.texture_info.y = round(state.texture_info.y);
+        break;
+    }
+
+    case SDL_EVENT_MOUSE_MOTION:
+    {
+        if (!state.is_dragging)
+        {
+            return SDL_APP_CONTINUE;
+        }
+        // since our renderer is scaled we need to fix the event before usage
+        SDL_ConvertEventToRenderCoordinates(state.renderer, event);
+        state.texture_info.x += event->motion.xrel;
+        state.texture_info.y += event->motion.yrel;
+    }
+    }
 
     return SDL_APP_CONTINUE;
 }
 
 SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 {
-    SDL_Window *window = state.window;
-    SDL_Texture *texture = state.texture;
-    SDL_FRect *rect_dest = &state.rect_dest;
-
-    if (event->type == SDL_EVENT_QUIT)
+    switch (event->type)
     {
+    case SDL_EVENT_QUIT:
         return SDL_APP_SUCCESS;
-    }
-
-    if (event->type == SDL_EVENT_KEY_DOWN)
-    {
-        SDL_Scancode scancode = event->key.scancode;
-        if (scancode >= SDL_SCANCODE_1 && scancode <= SDL_SCANCODE_0)
-        {
-            uint8_t number = ((scancode + 1) - SDL_SCANCODE_1) % 10;
-            state.tmp_scale *= 10;
-            state.tmp_scale += number;
-        }
-
-        if (scancode == SDL_SCANCODE_R)
-        {
-            state.window_scale = args.window_scale;
-            state.image_scale = args.image_scale;
-            state.opacity = args.opacity;
-            state.rect_dest.x = 0;
-            state.rect_dest.y = 0;
-
-            SDL_SetWindowOpacity(
-                window,
-                state.opacity);
-            SDL_SetRenderScale(
-                state.renderer,
-                state.image_scale,
-                state.image_scale);
-            SDL_SetWindowSize(
-                window,
-                texture->w * args.window_scale,
-                texture->h * args.window_scale);
-        }
-
-        switch (scancode)
-        {
-        case SDL_SCANCODE_RIGHT:
-            rect_dest->x += 1;
-            break;
-        case SDL_SCANCODE_LEFT:
-            rect_dest->x += -1;
-            break;
-        case SDL_SCANCODE_DOWN:
-            rect_dest->y += 1;
-            break;
-        case SDL_SCANCODE_UP:
-            rect_dest->y -= 1;
-            break;
-        }
-
-        if (!state.is_scaling)
-        {
-            if (scancode == SDL_SCANCODE_W)
-            {
-                state.is_scaling = SDL_SCANCODE_W;
-            }
-            else if (scancode == SDL_SCANCODE_I)
-            {
-                state.is_scaling = SDL_SCANCODE_I;
-            }
-            state.tmp_scale = 0;
-        }
-        else
-        {
-            if (scancode == SDL_SCANCODE_RETURN)
-            {
-                if (state.is_scaling == SDL_SCANCODE_W)
-                {
-                    state.window_scale = state.tmp_scale / 100.0f;
-                }
-                if (state.is_scaling == SDL_SCANCODE_I)
-                {
-                    state.image_scale = state.tmp_scale / 100.0f;
-                }
-
-                SDL_SetWindowSize(
-                    window,
-                    texture->w * state.window_scale,
-                    texture->h * state.window_scale);
-                SDL_SetRenderScale(
-                    state.renderer,
-                    state.image_scale,
-                    state.image_scale);
-
-                state.tmp_scale = 0;
-                state.is_scaling = SDL_SCANCODE_UNKNOWN;
-            }
-            if (scancode == SDL_SCANCODE_ESCAPE)
-            {
-                state.tmp_scale = 0;
-                state.is_scaling = SDL_SCANCODE_UNKNOWN;
-                return SDL_APP_CONTINUE;
-            }
-        }
-
-        if (scancode == SDL_SCANCODE_ESCAPE)
-        {
-            return SDL_APP_SUCCESS;
-        }
-    }
-
-    if (event->type == SDL_EVENT_MOUSE_WHEEL)
-    {
-        state.opacity += (event->wheel.y > .0f) ? +.1f : -.1f;
-        state.opacity = SDL_clamp(state.opacity, 0.0f, 1.0f);
-        SDL_SetWindowOpacity(window, state.opacity);
-    }
-
-    if (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN && !state.is_dragging)
-    {
-        state.is_dragging = true;
-    }
-
-    if (event->type == SDL_EVENT_MOUSE_MOTION && state.is_dragging)
-    {
-        // since our renderer is scaled we need to fix the event before usage
-        SDL_ConvertEventToRenderCoordinates(state.renderer, event);
-        rect_dest->x += event->motion.xrel;
-        rect_dest->y += event->motion.yrel;
-    }
-
-    if (event->type == SDL_EVENT_MOUSE_BUTTON_UP)
-    {
-        state.is_dragging = false;
-
-        // round our drag and drop to be pixel perfect
-        rect_dest->x = round(rect_dest->x);
-        rect_dest->y = round(rect_dest->y);
+    case SDL_EVENT_KEY_DOWN:
+        return handle_key_down_event(event->key.scancode);
+    case SDL_EVENT_MOUSE_WHEEL:
+        return handle_mouse_wheel_event(event->wheel.y);
+    case SDL_EVENT_MOUSE_MOTION:
+    case SDL_EVENT_MOUSE_BUTTON_UP:
+    case SDL_EVENT_MOUSE_BUTTON_DOWN:
+        return handle_mouse_button_event(event);
     }
 
     return SDL_APP_CONTINUE;
 }
 
-SDL_AppResult SDL_AppIterate(void *appstate)
+SDL_AppResult SDL_AppIterate(void *)
 {
     SDL_RenderClear(state.renderer);
-    SDL_RenderTexture(state.renderer, state.texture, NULL, &state.rect_dest);
+    SDL_RenderTexture(state.renderer, state.texture, NULL, &state.texture_info);
     SDL_RenderPresent(state.renderer);
 
     return SDL_APP_CONTINUE;
