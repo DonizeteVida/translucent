@@ -76,18 +76,18 @@ struct
     SDL_FRect texture_info;
 
     bool is_dragging;
-
-    void (*event_handler)(SDL_Event *);
 } static state;
 
 struct
 {
     uint16_t scale;
-} scale_all_state = {
+    bool is_scaling;
+} static state_scale = {
     .scale = 0,
+    .is_scaling = false,
 };
 
-static void scale_window_and_image_handler(SDL_Event *event)
+static void scale_by_keyboard_handler(SDL_Event *event)
 {
     if (event->type != SDL_EVENT_KEY_DOWN)
     {
@@ -98,9 +98,10 @@ static void scale_window_and_image_handler(SDL_Event *event)
 
     switch (scancode)
     {
-    case SDL_SCANCODE_A:
+    case SDL_SCANCODE_S:
     {
-        scale_all_state.scale = 0;
+        state_scale.scale = 0;
+        state_scale.is_scaling = true;
         break;
     }
     case SDL_SCANCODE_0:
@@ -115,17 +116,29 @@ static void scale_window_and_image_handler(SDL_Event *event)
     case SDL_SCANCODE_9:
     {
         uint8_t number = ((scancode + 1) - SDL_SCANCODE_1) % 10;
-        scale_all_state.scale *= 10;
-        scale_all_state.scale += number;
+        state_scale.scale *= 10;
+        state_scale.scale += number;
         break;
     }
     case SDL_SCANCODE_RETURN:
     {
-        state.window_scale = scale_all_state.scale / 100.0f;
+        if (!state_scale.is_scaling)
+        {
+            return;
+        }
+
+        if (state_scale.scale == 0)
+        {
+            state_scale.scale = 100;
+        }
+
+        state.window_scale = state_scale.scale / 100.0f;
         SDL_SetWindowSize(state.window, state.texture->w * state.window_scale, state.texture->h * state.window_scale);
 
-        state.image_scale = scale_all_state.scale / 100.0f;
+        state.image_scale = state_scale.scale / 100.0f;
         SDL_SetRenderScale(state.renderer, state.image_scale, state.image_scale);
+
+        state_scale.is_scaling = false;
         break;
     }
     }
@@ -280,7 +293,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 
     move_image_by_arrows_handler(event);
     move_image_by_mouse_cursor_handler(event);
-    scale_window_and_image_handler(event);
+    scale_by_keyboard_handler(event);
     restore_default_state_handler(event);
     change_opacity_handler(event);
 
