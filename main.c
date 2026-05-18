@@ -11,11 +11,14 @@
 
 struct
 {
+    const char *path;
+    char filename[256];
     float window_scale;
     float image_scale;
     float opacity;
-    char filename[256];
 } static args = {
+    .filename = {0},
+    .path = NULL,
     .window_scale = 1.0f,
     .image_scale = 1.0f,
     .opacity = .5f,
@@ -23,6 +26,8 @@ struct
 
 static void parse_args(int argc, char *argv[])
 {
+    args.path = argv[0];
+
     int opt, index;
 
     struct option long_options[] = {
@@ -74,7 +79,75 @@ struct
     float window_scale;
     float image_scale;
     float opacity;
-} static state;
+} static state = {
+    .window = NULL,
+    .renderer = NULL,
+    .texture = NULL,
+};
+
+static void initialize_texture_from_args()
+{
+    if (state.texture)
+    {
+        SDL_DestroyTexture(state.texture);
+    }
+
+    state.texture = IMG_LoadTexture(state.renderer, args.filename);
+    if (state.texture == NULL)
+    {
+        SDL_Log("Couldn't load texture SDL: %s", SDL_GetError());
+        return;
+    }
+
+    state.window_scale = args.window_scale;
+    state.image_scale = args.image_scale;
+    state.opacity = args.opacity;
+    state.texture_info = (SDL_FRect){
+        .x = 0,
+        .y = 0,
+        .w = state.texture->w,
+        .h = state.texture->h,
+    };
+
+    SDL_SetWindowSize(state.window, state.texture->w * state.window_scale, state.texture->h * state.window_scale);
+    SDL_SetRenderScale(state.renderer, state.image_scale, state.image_scale);
+    SDL_SetWindowOpacity(state.window, state.opacity);
+    SDL_SetTextureScaleMode(state.texture, SDL_SCALEMODE_NEAREST);
+}
+
+static void show_open_file_dialog_callback(void *userdata, const char *const *filelist, int filter)
+{
+    if (filelist == NULL)
+    {
+        SDL_Log("Filelist is null: %s", SDL_GetError());
+        return;
+    }
+
+    const char *const filename = filelist[0];
+    printf("Selected file: %s", filename);
+
+    strncpy(args.filename, filename, sizeof(args.filename));
+
+    initialize_texture_from_args();
+}
+
+static void show_open_file_dialog()
+{
+    const SDL_DialogFileFilter filters[] = {
+        {"PNG images", "png"},
+        {"JPEG images", "jpg;jpeg"},
+        {"All images", "png;jpg;jpeg"},
+    };
+
+    SDL_ShowOpenFileDialog(
+        show_open_file_dialog_callback,
+        /*userData*/ NULL,
+        state.window,
+        filters,
+        /*nfilters*/ 3,
+        args.path,
+        /*allowMany*/ false);
+}
 
 struct
 {
@@ -251,27 +324,12 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         return SDL_APP_FAILURE;
     }
 
-    state.texture = IMG_LoadTexture(state.renderer, args.filename);
+    initialize_texture_from_args();
+
     if (state.texture == NULL)
     {
-        SDL_Log("Couldn't load texture SDL: %s", SDL_GetError());
-        return SDL_APP_FAILURE;
+        show_open_file_dialog();
     }
-
-    state.window_scale = args.window_scale;
-    state.image_scale = args.image_scale;
-    state.opacity = args.opacity;
-    state.texture_info = (SDL_FRect){
-        .x = 0,
-        .y = 0,
-        .w = state.texture->w,
-        .h = state.texture->h,
-    };
-
-    SDL_SetWindowSize(state.window, state.texture->w * state.window_scale, state.texture->h * state.window_scale);
-    SDL_SetRenderScale(state.renderer, state.image_scale, state.image_scale);
-    SDL_SetWindowOpacity(state.window, state.opacity);
-    SDL_SetTextureScaleMode(state.texture, SDL_SCALEMODE_NEAREST);
 
     return SDL_APP_CONTINUE;
 }
