@@ -85,14 +85,14 @@ struct
     .texture = NULL,
 };
 
-static void initialize_texture_from_args()
+static void initialize_texture_from_filename(const char *const filename)
 {
     if (state.texture)
     {
         SDL_DestroyTexture(state.texture);
     }
 
-    state.texture = IMG_LoadTexture(state.renderer, args.filename);
+    state.texture = IMG_LoadTexture(state.renderer, filename);
     if (state.texture == NULL)
     {
         SDL_Log("Couldn't load texture SDL: %s", SDL_GetError());
@@ -122,19 +122,15 @@ static void show_open_file_dialog_callback(void *userdata, const char *const *fi
         SDL_Log("Filelist is null: %s", SDL_GetError());
         return;
     }
-    
+
     const char *const filename = filelist[0];
-    printf("Selected file: %s", filename);
-
-    strncpy(args.filename, filename, sizeof(args.filename));
-
-    initialize_texture_from_args();
+    initialize_texture_from_filename(filename);
 }
 
 static void show_open_file_dialog()
 {
     const SDL_DialogFileFilter filters[] = {
-        {"All images", "png;jpg;jpeg"},
+        {"Just The Two Of Us", "png;jpg;jpeg"},
     };
 
     SDL_ShowOpenFileDialog(
@@ -330,7 +326,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         return SDL_APP_FAILURE;
     }
 
-    initialize_texture_from_args();
+    initialize_texture_from_filename(args.filename);
 
     if (state.texture == NULL)
     {
