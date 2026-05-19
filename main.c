@@ -124,6 +124,12 @@ static void show_open_file_dialog_callback(void *userdata, const char *const *fi
     }
 
     const char *const filename = filelist[0];
+    if (filename == NULL)
+    {
+        fprintf(stderr, "File picker filename is null");
+        return;
+    }
+
     initialize_texture_from_filename(filename);
 }
 
