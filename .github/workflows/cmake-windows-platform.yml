@@ -1,8 +1,7 @@
 name: CMake for Windows
 
 on:
-  push:
-    branches: [ "main" ]
+  workflow_dispatch:
 
 env:
   BUILD_TYPE: Release
