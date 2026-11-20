@@ -340,22 +340,56 @@ static void draw_bottom_left_rendered_text(const char *text)
     TTF_DrawRendererText(state.text, 0, renderer_height - text_height);
 }
 
-static void draw_left_logs()
+static void draw_bottom_right_rendered_text(const char *text)
 {
-    static char bottom_left_text[256];
+    int text_width, text_height;
+    int renderer_width, renderer_height;
+
+    TTF_SetTextString(state.text, text, strlen(text));
+
+    SDL_GetRenderOutputSize(state.renderer, &renderer_width, &renderer_height);
+    TTF_GetTextSize(state.text, &text_width, &text_height);
+
+    renderer_width /= state.renderer_scale;
+    renderer_height /= state.renderer_scale;
+
+    TTF_DrawRendererText(state.text, renderer_width - text_width, renderer_height - text_height);
+}
+
+static void draw_bottom_left_logs()
+{
+    static char buf[256];
     static const char template[] =
         "Scale: %.1f"
         "\n"
         "Opacity: %.1f";
 
     snprintf(
-        bottom_left_text,
-        sizeof(bottom_left_text),
+        buf,
+        sizeof(buf),
         template,
         state.renderer_scale,
         state.opacity);
 
-    draw_bottom_left_rendered_text(bottom_left_text);
+    draw_bottom_left_rendered_text(buf);
+}
+
+static void draw_bottom_right_logs()
+{
+    static char buf[256];
+    static const char template[] =
+        "X: %.1f"
+        "\n"
+        "Y: %.1f";
+
+    snprintf(
+        buf,
+        sizeof(buf),
+        template,
+        state.texture_info.x,
+        state.texture_info.y);
+
+    draw_bottom_right_rendered_text(buf);
 }
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
@@ -452,7 +486,8 @@ SDL_AppResult SDL_AppIterate(void *)
 
     if (state.logs)
     {
-        draw_left_logs();
+        draw_bottom_left_logs();
+        draw_bottom_right_logs();
     }
 
     SDL_RenderPresent(state.renderer);
