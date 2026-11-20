@@ -19,13 +19,13 @@ struct
     const char *path;
     char filename[256];
     float window_scale;
-    float image_scale;
+    float renderer_scale;
     float opacity;
 } static args = {
     .filename = {0},
     .path = NULL,
     .window_scale = 1.0f,
-    .image_scale = 1.0f,
+    .renderer_scale = 1.0f,
     .opacity = .5f,
 };
 
@@ -54,7 +54,7 @@ static void parse_args(int argc, char *argv[])
 
         case 'i':
         {
-            args.image_scale = atof(optarg);
+            args.renderer_scale = atof(optarg);
             break;
         }
 
@@ -86,7 +86,7 @@ struct
     TTF_Text *text;
 
     float window_scale;
-    float image_scale;
+    float renderer_scale;
     float opacity;
 } static state = {
     .window = NULL,
@@ -112,7 +112,7 @@ static void initialize_texture_from_filename(const char *const filename)
     }
 
     state.window_scale = args.window_scale;
-    state.image_scale = args.image_scale;
+    state.renderer_scale = args.renderer_scale;
     state.opacity = args.opacity;
     state.texture_info = (SDL_FRect){
         .x = 0,
@@ -122,7 +122,7 @@ static void initialize_texture_from_filename(const char *const filename)
     };
 
     SDL_SetWindowSize(state.window, state.texture->w * state.window_scale, state.texture->h * state.window_scale);
-    SDL_SetRenderScale(state.renderer, state.image_scale, state.image_scale);
+    SDL_SetRenderScale(state.renderer, state.renderer_scale, state.renderer_scale);
     SDL_SetWindowOpacity(state.window, state.opacity);
     SDL_SetTextureScaleMode(state.texture, SDL_SCALEMODE_NEAREST);
 }
@@ -218,8 +218,8 @@ static void scale_by_keyboard(SDL_Event *event)
         state.window_scale = state_scale.scale / 100.0f;
         SDL_SetWindowSize(state.window, state.texture->w * state.window_scale, state.texture->h * state.window_scale);
 
-        state.image_scale = state_scale.scale / 100.0f;
-        SDL_SetRenderScale(state.renderer, state.image_scale, state.image_scale);
+        state.renderer_scale = state_scale.scale / 100.0f;
+        SDL_SetRenderScale(state.renderer, state.renderer_scale, state.renderer_scale);
 
         state_scale.is_scaling = false;
         break;
@@ -261,8 +261,8 @@ static void restore_default_state_by_pressing_r(SDL_Event *event)
     state.window_scale = args.window_scale;
     SDL_SetWindowSize(state.window, state.texture->w * args.window_scale, state.texture->h * args.window_scale);
 
-    state.image_scale = args.image_scale;
-    SDL_SetRenderScale(state.renderer, state.image_scale, state.image_scale);
+    state.renderer_scale = args.renderer_scale;
+    SDL_SetRenderScale(state.renderer, state.renderer_scale, state.renderer_scale);
 
     state.texture_info.x = 0;
     state.texture_info.y = 0;
@@ -326,6 +326,9 @@ static void draw_bottom_left_rendered_text(const char *text)
     SDL_GetRenderOutputSize(state.renderer, &renderer_width, &renderer_height);
     TTF_GetTextSize(state.text, &text_width, &text_height);
 
+    renderer_width /= state.renderer_scale;
+    renderer_height /= state.renderer_scale;
+
     TTF_DrawRendererText(state.text, 0, renderer_height - text_height);
 }
 
@@ -363,7 +366,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         return SDL_APP_FAILURE;
     }
 
-    state.text_font = TTF_OpenFontIO(SDL_IOFromConstMem(default_font_ttf, default_font_ttf_size), true, 18.0f * 2);
+    state.text_font = TTF_OpenFontIO(SDL_IOFromConstMem(default_font_ttf, default_font_ttf_size), true, 25);
     if (state.text_font == NULL)
     {
         SDL_Log("Couldn't create TTF_font: %s", SDL_GetError());
