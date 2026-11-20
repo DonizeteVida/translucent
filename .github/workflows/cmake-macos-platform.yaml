@@ -1,0 +1,58 @@
+name: CMake for macOS Universal
+
+on:
+  workflow_dispatch:
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Configure brew
+        run: |
+          brew update
+          brew install nasm
+
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Configure CMake
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
+            -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+
+      - name: Build
+        run: |
+          cmake --build build \
+            --config ${{env.BUILD_TYPE}} \
+            --parallel
+
+      - name: Verify architectures
+        run: |
+          lipo -info build/translucent-sdl3
+
+      - name: Rename file
+        run: |
+          mv                        \
+            build/translucent-sdl3  \
+            build/translucent-sdl3-macos
+
+      - name: Upload
+        uses: actions/upload-artifact@v7
+        with:
+          name: translucent-sdl3-macos
+          path: build/translucent-sdl3-macos
+          compression-level: 9
+
+      - name: Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: nightly
+          make_latest: true
+          token: ${{secrets.GH_PAT}}
+          files: build/translucent-sdl3-macos
