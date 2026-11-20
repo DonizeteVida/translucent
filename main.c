@@ -88,6 +88,8 @@ struct
     float window_scale;
     float renderer_scale;
     float opacity;
+
+    bool logs;
 } static state = {
     .window = NULL,
     .renderer = NULL,
@@ -95,6 +97,7 @@ struct
     .text_font = NULL,
     .text_engine = NULL,
     .text = NULL,
+    .logs = false,
 };
 
 static void initialize_texture_from_filename(const char *const filename)
@@ -172,11 +175,6 @@ struct
 
 static void scale_by_keyboard(SDL_Event *event)
 {
-    if (event->type != SDL_EVENT_KEY_DOWN)
-    {
-        return;
-    }
-
     SDL_Scancode scancode = event->key.scancode;
 
     switch (scancode)
@@ -224,6 +222,16 @@ static void scale_by_keyboard(SDL_Event *event)
         state_scale.is_scaling = false;
         break;
     }
+    }
+}
+
+static void show_logs_by_keyboard(SDL_Event *event)
+{
+    SDL_Scancode scancode = event->key.scancode;
+
+    if (scancode == SDL_SCANCODE_L)
+    {
+        state.logs = !state.logs;
     }
 }
 
@@ -332,6 +340,24 @@ static void draw_bottom_left_rendered_text(const char *text)
     TTF_DrawRendererText(state.text, 0, renderer_height - text_height);
 }
 
+static void draw_left_logs()
+{
+    static char bottom_left_text[256];
+    static const char template[] =
+        "Scale: %.1f"
+        "\n"
+        "Opacity: %.1f";
+
+    snprintf(
+        bottom_left_text,
+        sizeof(bottom_left_text),
+        template,
+        state.renderer_scale,
+        state.opacity);
+
+    draw_bottom_left_rendered_text(bottom_left_text);
+}
+
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 {
     parse_args(argc, argv);
@@ -403,10 +429,15 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
         return SDL_APP_SUCCESS;
     }
 
-    move_image_by_arrows(event);
+    if (event->type == SDL_EVENT_KEY_DOWN)
+    {
+        move_image_by_arrows(event);
+        scale_by_keyboard(event);
+        restore_default_state_by_pressing_r(event);
+        show_logs_by_keyboard(event);
+    }
+
     move_image_by_mouse_cursor(event);
-    scale_by_keyboard(event);
-    restore_default_state_by_pressing_r(event);
     change_opacity_by_wheel(event);
     trigger_file_picker_by_double_click(event);
 
@@ -418,7 +449,11 @@ SDL_AppResult SDL_AppIterate(void *)
     SDL_RenderClear(state.renderer);
 
     SDL_RenderTexture(state.renderer, state.texture, NULL, &state.texture_info);
-    draw_bottom_left_rendered_text("Hello World");
+
+    if (state.logs)
+    {
+        draw_left_logs();
+    }
 
     SDL_RenderPresent(state.renderer);
 
