@@ -20,27 +20,35 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Configure CMake
+      - name: Build ARM64
         run: |
-          cmake -B build \
+          cmake -B build-arm64 \
             -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
-            -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+            -DCMAKE_OSX_ARCHITECTURES=arm64
 
-      - name: Build
+          cmake --build build-arm64 \
+            --config ${{env.BUILD_TYPE}}
+
+      - name: Build x86_64
         run: |
-          cmake --build build \
-            --config ${{env.BUILD_TYPE}} \
-            --parallel
+          cmake -B build-x86_64 \
+            -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
+            -DCMAKE_OSX_ARCHITECTURES=x86_64
+
+          cmake --build build-x86_64 \
+            --config ${{env.BUILD_TYPE}}
+
+      - name: Create Universal Binary
+        run: |
+          mkdir build
+          lipo -create \
+            build-arm64/translucent-sdl3 \
+            build-x86_64/translucent-sdl3 \
+            -output build/translucent-sdl3-macos
 
       - name: Verify architectures
         run: |
-          lipo -info build/translucent-sdl3
-
-      - name: Rename file
-        run: |
-          mv                        \
-            build/translucent-sdl3  \
-            build/translucent-sdl3-macos
+          lipo -info build/translucent-sdl3-macos
 
       - name: Upload
         uses: actions/upload-artifact@v7
