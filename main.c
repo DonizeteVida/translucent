@@ -148,7 +148,7 @@ static void show_open_file_dialog_callback(void *userdata, const char *const *fi
 static void show_open_file_dialog()
 {
     const SDL_DialogFileFilter filters[] = {
-        {"Just The Two Of Us", "png;jpg;jpeg"},
+        {"Just The Two Of Us", "*"},
     };
 
     SDL_ShowOpenFileDialog(
