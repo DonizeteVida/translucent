@@ -42,19 +42,19 @@ jobs:
         run: |
           mkdir build
           lipo -create \
-            build-arm64/translucent-sdl3 \
-            build-x86_64/translucent-sdl3 \
-            -output build/translucent-sdl3-macos
+            build-arm64/translucent-sdl3.app/Contents/MacOS/translucent-sdl3 \
+            build-x86_64/translucent-sdl3.app/Contents/MacOS/translucent-sdl3 \
+            -output build/translucent-sdl3-macos-universal
 
       - name: Verify architectures
         run: |
-          lipo -info build/translucent-sdl3-macos
+          lipo -info build/translucent-sdl3-macos-universal
 
-      - name: Upload
+      - name: Upload Universal
         uses: actions/upload-artifact@v7
         with:
-          name: translucent-sdl3-macos
-          path: build/translucent-sdl3-macos
+          name: translucent-sdl3-macos-universal
+          path: build/translucent-sdl3-macos-universal
           compression-level: 9
 
       - name: Release
@@ -63,4 +63,4 @@ jobs:
           tag_name: nightly
           make_latest: true
           token: ${{secrets.GH_PAT}}
-          files: build/translucent-sdl3-macos
+          files: build/translucent-sdl3-macos-universal

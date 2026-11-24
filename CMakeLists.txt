@@ -4,7 +4,13 @@ project(translucent VERSION 0.1.0 LANGUAGES C)
 add_subdirectory(external)
 add_subdirectory(resources)
 
-add_executable(translucent-sdl3 main.c)
+if(APPLE)
+    include(cmake/macos.cmake)
+elseif(WIN32)
+    add_executable(translucent-sdl3 main.c)
+else()
+    add_executable(translucent-sdl3 main.c)
+endif()
 
 target_link_libraries(
     translucent-sdl3
