@@ -45,10 +45,16 @@ jobs:
             build-arm64/translucent-sdl3.app/Contents/MacOS/translucent-sdl3 \
             build-x86_64/translucent-sdl3.app/Contents/MacOS/translucent-sdl3 \
             -output build/translucent-sdl3-macos-universal
+          chmod +x build/translucent-sdl3-macos-universal
 
       - name: Verify architectures
         run: |
           lipo -info build/translucent-sdl3-macos-universal
+
+      - name: Zip .app files
+        run: |
+          zip -r build/translucent-sdl3-arm64.app.zip build-arm64/translucent-sdl3.app
+          zip -r build/translucent-sdl3-x86_64.app.zip build-x86_64/translucent-sdl3.app
 
       - name: Upload Universal
         uses: actions/upload-artifact@v7
@@ -63,4 +69,7 @@ jobs:
           tag_name: nightly
           make_latest: true
           token: ${{secrets.GH_PAT}}
-          files: build/translucent-sdl3-macos-universal
+          files: |
+            build/translucent-sdl3-macos-universal
+            build/translucent-sdl3-arm64.app.zip
+            build/translucent-sdl3-x86_64.app.zip
